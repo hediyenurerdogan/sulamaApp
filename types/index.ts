@@ -44,6 +44,29 @@ export interface IrrigationAdvice {
   aiAssistantMessage: string; // Asistan konuşma metni
 }
 
+// --- YENİ EKLENEN TİPLER ---
+
+export type WaterNeed = 'Az' | 'Orta' | 'Çok';
+
+export interface PlantLocation {
+  type: 'Saksı' | 'Bahçe' | 'Sera';
+  subType?: 'Ev içi' | 'Balkon';
+}
+
+export interface Plant {
+  id: string;
+  name: string; // Kullanıcının verdiği isim (örn: "Salon Çiçeğim")
+  typeId: string; // PLANT_TYPES id'si (örn: 'succulent')
+  location: PlantLocation;
+  waterNeed: WaterNeed;
+  lastWateredDate: string | null; // ISO Date string
+  lastSoilChangeDate: string | null; // ISO Date string
+  notificationsEnabled: boolean;
+  createdAt: string;
+}
+
+// ---------------------------
+
 export const PLANT_TYPES: PlantType[] = [
   { id: 'vegetable', name: 'Sebze', description: 'Domates, Biber vb.', waterFactor: 1.2, icon: 'Carrot' },
   { id: 'fruit', name: 'Meyve Ağacı', description: 'Elma, Kiraz vb.', waterFactor: 1.0, icon: 'Apple' },

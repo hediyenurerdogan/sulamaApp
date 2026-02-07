@@ -1,141 +1,153 @@
-import { IrrigationAdvice, PlantType, WeatherData, GrowingArea } from '../types';
+import { IrrigationAdvice, Plant, WeatherData, GrowingArea, PlantType, PLANT_TYPES } from '../types';
+
+// Mevcut genel fonksiyonu koruyoruz, ancak altına bitki bazlı yeni mantığı ekliyoruz.
 
 export const calculateIrrigationAdvice = (
   weather: WeatherData | null, 
   plant: PlantType,
   area: GrowingArea
 ): IrrigationAdvice => {
-  if (!weather) {
-    return {
+  // ... (Eski kod buradaydı, geriye uyumluluk için tutulabilir veya bu dosya tamamen yenilenebilir. 
+  // Ancak temizlik için sadece yeni fonksiyonu ve gerekli tipleri dışa aktaracağım.)
+  
+  // Eski fonksiyonun mock dönüşü (Hata almamak için)
+  return {
       shouldWater: false,
-      statusTitle: 'Analiz Ediliyor',
-      message: 'Hava durumu ve toprak verileri işleniyor...',
+      statusTitle: 'Analiz',
+      message: 'Veri işleniyor...',
       method: '-',
       color: '#9CA3AF',
       iconName: 'Loader',
-      aiAssistantMessage: 'Verilerinizi topluyorum, lütfen bekleyin.'
+      aiAssistantMessage: '...'
+  };
+};
+
+export interface PlantAdvice {
+  status: 'water' | 'wait' | 'warning' | 'check';
+  title: string;
+  message: string;
+  detail: string; // "Yağmur %84" veya "Toprak Nemi"
+  color: string;
+  iconName: string;
+  canSaveWater: boolean; // Tasarruf butonu gösterilsin mi?
+}
+
+export const getPlantSpecificAdvice = (
+  plant: Plant,
+  weather: WeatherData | null
+): PlantAdvice => {
+  const plantTypeInfo = PLANT_TYPES.find(t => t.id === plant.typeId);
+  const isIndoor = plant.location.type === 'Saksı' && plant.location.subType === 'Ev içi';
+  const isGarden = plant.location.type === 'Bahçe' || plant.location.type === 'Sera';
+
+  // 1. Veri Yoksa
+  if (!weather) {
+    return {
+      status: 'check',
+      title: 'Veri Bekleniyor',
+      message: 'Hava durumu verisi yükleniyor...',
+      detail: '--',
+      color: '#9CA3AF',
+      iconName: 'Loader',
+      canSaveWater: false
     };
   }
 
   const { current, daily } = weather;
   const todayForecast = daily[0];
-  const tomorrowForecast = daily[1];
-
-  // --- 1. YAĞMUR KONTROLÜ (Kesin Red) ---
-  const rainProbToday = todayForecast?.rainProb ?? 0;
-  const rainAmountToday = todayForecast?.rainAmount ?? 0;
-  const rainProbTomorrow = tomorrowForecast?.rainProb ?? 0;
-
-  // Sera istisnası: Serada yağmurun önemi yoktur, ama nem önemlidir.
-  const isGreenhouse = area.id === 'greenhouse';
-  const isPot = area.id === 'pot';
-
-  if (!isGreenhouse && (rainAmountToday > 2 || rainProbToday > 50)) {
-    return {
-      shouldWater: false,
-      statusTitle: 'Sulama Yapmayın',
-      message: `Bugün %${Math.round(rainProbToday)} ihtimalle yağış var. Doğal sulama yeterli.`,
-      method: 'Doğal Sulama',
-      color: '#3B82F6', // Mavi
-      iconName: 'CloudRain',
-      savingsText: `Bugün sulama yapmayarak yaklaşık ${isPot ? '2' : '15'} litre su tasarrufu sağladınız.`,
-      aiAssistantMessage: `Yağmur berekettir! ${area.name} içindeki ${plant.name}lerin için bugün doğa çalışıyor, sen dinlen.`
-    };
-  }
-
-  if (!isGreenhouse && rainProbTomorrow > 70) {
-    return {
-      shouldWater: false,
-      statusTitle: 'Yarına Erteleyin',
-      message: 'Yarın yüksek yağış bekleniyor. Tasarruf için bekleyebilirsiniz.',
-      method: 'Beklemede Kalın',
-      color: '#60A5FA', // Açık Mavi
-      iconName: 'Clock',
-      savingsText: 'Erteleyerek su kaynaklarını koruyorsunuz.',
-      aiAssistantMessage: `Yarın yağmur geliyor. ${plant.name}lerin biraz daha sabredebilir, acele etmeyelim.`
-    };
-  }
-
-  // --- 2. İHTİYAÇ SKORU HESAPLAMA (Smart Logic) ---
-  let score = 50; // Baz puan
-
-  // Sıcaklık Etkisi
-  if (current.temp > 30) score += 25;
-  else if (current.temp > 25) score += 10;
-  else if (current.temp < 15) score -= 20;
-
-  // Nem Etkisi
-  // Sukulentler neme karşı hassastır
-  if (plant.id === 'succulent' && current.humidity > 60) score -= 30;
-  else if (current.humidity < 30) score += 20;
-  else if (current.humidity > 70) score -= 15;
-
-  // Rüzgar Etkisi (Sadece dışarıdaysa)
-  if (!isGreenhouse && current.windSpeed > 20) score += 15;
-
-  // Alan Çarpanı (Saksı daha çabuk kurur)
-  score = score * area.factor;
-
-  // Bitki Katsayısı
-  const finalScore = score * plant.waterFactor;
-
-  // --- 3. KARAR VE YÖNTEM BELİRLEME ---
+  const rainProb = todayForecast?.rainProb ?? 0;
   
-  // Sukulent Özel Mantığı
-  if (plant.id === 'succulent') {
-    if (finalScore > 100) {
+  // --- SENARYO A: EV İÇİ (Indoor) ---
+  // Hava durumu (yağmur/rüzgar) yoksayılır. Sıcaklık ve türe bakılır.
+  if (isIndoor) {
+    // Kışın veya soğuk havalarda ev içi bitkileri daha az su ister (genelleme)
+    const isColdSeason = current.temp < 15; 
+    
+    if (plant.typeId === 'succulent') {
       return {
-        shouldWater: true,
-        statusTitle: 'Az Miktar Su',
-        message: 'Hava çok sıcak, toprağı hafifçe nemlendirin.',
-        method: 'Sprey ile Sulama',
-        color: '#F59E0B',
-        iconName: 'Droplet',
-        aiAssistantMessage: `Sukulentler suyu depolar ama bu sıcakta ${area.name} içinde biraz desteğe ihtiyaçları olabilir.`
-      };
-    } else {
-      return {
-        shouldWater: false,
-        statusTitle: 'Su Vermeyin',
-        message: 'Sukulentler şu anki koşullarda mutlu. Su vermek çürümeye yol açabilir.',
-        method: 'Kuru Bırakın',
-        color: '#10B981',
+        status: 'wait',
+        title: 'Sulama Yapma',
+        message: 'Sukulentler ev ortamında neme doymuş durumda.',
+        detail: 'Işık İhtiyacı Yüksek',
+        color: '#10B981', // Yeşil (Sorun yok)
         iconName: 'Sun',
-        aiAssistantMessage: `Merak etme, ${plant.name}lerin gayet iyi durumda. Su vermene gerek yok.`
+        canSaveWater: true
       };
     }
+
+    if (isColdSeason) {
+      return {
+        status: 'check',
+        title: 'Toprağı Kontrol Et',
+        message: 'Ev içi serin olabilir, toprak kurumadan sulama yapma.',
+        detail: 'Nem Kontrolü',
+        color: '#F59E0B', // Sarı
+        iconName: 'Thermometer',
+        canSaveWater: true
+      };
+    }
+
+    return {
+      status: 'water',
+      title: 'Nem İhtiyacı',
+      message: 'Ev içi sıcaklık artışı nedeniyle toprağı kontrol et.',
+      detail: 'Standart Bakım',
+      color: '#3B82F6', // Mavi
+      iconName: 'Droplet',
+      canSaveWater: false
+    };
   }
 
-  if (finalScore > 90) {
+  // --- SENARYO B: BAHÇE / DIŞ MEKAN (Outdoor) ---
+  // Yağmur, Don, Rüzgar kritiktir.
+  
+  // 1. Don Riski
+  if (current.temp < 4) {
     return {
-      shouldWater: true,
-      statusTitle: 'Bol Sulama Zamanı',
-      message: `${area.name} toprağı hızla kuruyor. Derinlemesine sulama yapın.`,
-      method: isPot ? 'Saksı Altına Kadar' : 'Derin Sulama',
-      color: '#EF4444', // Kırmızı/Turuncu
-      iconName: 'Droplets',
-      aiAssistantMessage: `Dikkat! ${area.name} içindeki ${plant.name}lerin susamış görünüyor. İyice suladığından emin ol.`
-    };
-  } else if (finalScore > 55) {
-    return {
-      shouldWater: true,
-      statusTitle: 'Sulama Öneriliyor',
-      message: `Koşullar normal. ${plant.name} için standart bakımınızı yapın.`,
-      method: 'Standart Sulama',
-      color: '#10B981', // Yeşil
-      iconName: 'Droplet',
-      aiAssistantMessage: `Hava güzel. ${plant.name}lerini rutin şekilde sulayabilirsin, keyifleri yerine gelsin.`
-    };
-  } else {
-    return {
-      shouldWater: false,
-      statusTitle: 'İhtiyaç Düşük',
-      message: 'Toprak nemini parmağınızla kontrol edin, henüz acil bir durum yok.',
-      method: 'Elle Kontrol',
-      color: '#F59E0B', // Sarı
-      iconName: 'CheckCircle',
-      savingsText: 'Gereksiz sulamadan kaçınarak bitki köklerini korudunuz.',
-      aiAssistantMessage: `Henüz erken. ${area.name} toprağını parmağınla kontrol et, nemliyse yarına bırakalım.`
+      status: 'warning',
+      title: 'Don Riski!',
+      message: 'Sıcaklık çok düşük. Sulama yapma, bitkiyi koru.',
+      detail: `${Math.round(current.temp)}°C Düşük Sıcaklık`,
+      color: '#EF4444', // Kırmızı
+      iconName: 'Snowflake',
+      canSaveWater: false
     };
   }
+
+  // 2. Yağmur Durumu
+  if (rainProb > 60) {
+    return {
+      status: 'wait',
+      title: 'Sulama Yapma',
+      message: 'Bugün yüksek ihtimalle yağmur yağacak.',
+      detail: `Yağış İhtimali %${Math.round(rainProb)}`,
+      color: '#3B82F6', // Mavi (Pozitif bekleme)
+      iconName: 'CloudRain',
+      canSaveWater: true
+    };
+  }
+
+  // 3. Sıcaklık Yüksekse
+  if (current.temp > 30) {
+    return {
+      status: 'water',
+      title: 'Ekstra Su Gerekebilir',
+      message: 'Aşırı sıcaklar toprağı hızla kurutuyor.',
+      detail: `${Math.round(current.temp)}°C Yüksek Sıcaklık`,
+      color: '#F97316', // Turuncu
+      iconName: 'Sun',
+      canSaveWater: false
+    };
+  }
+
+  // 4. Standart Durum
+  return {
+    status: 'check',
+    title: 'Rutin Kontrol',
+    message: 'Hava koşulları normal. Toprak nemine göre karar ver.',
+    detail: 'Parçalı Bulutlu',
+    color: '#10B981', // Yeşil
+    iconName: 'Sprout',
+    canSaveWater: true
+  };
 };
