@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import { PlantType, PLANT_TYPES, WeatherData } from '../types';
+import { PlantType, PLANT_TYPES, WeatherData, GrowingArea, GROWING_AREAS } from '../types';
 import { getWeatherData, getCoordinatesByCity } from '../services/weatherService';
 
 interface AppContextType {
   selectedPlant: PlantType;
   setPlant: (plant: PlantType) => void;
+  selectedArea: GrowingArea;
+  setArea: (area: GrowingArea) => void;
   weather: WeatherData | null;
   loading: boolean;
   locationName: string;
@@ -19,20 +21,30 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedPlant, setSelectedPlant] = useState<PlantType>(PLANT_TYPES[0]);
+  const [selectedArea, setSelectedArea] = useState<GrowingArea>(GROWING_AREAS[1]); // Default: Bahçe
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState('Konum Bulunuyor...');
   
-  // Koordinatları state'de tutuyoruz ki refresh yapabilelim
   const [coords, setCoords] = useState<{lat: number, lon: number} | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('selectedPlantId').then((id) => {
-      if (id) {
-        const plant = PLANT_TYPES.find((p) => p.id === id);
+    // Load saved preferences
+    const loadPrefs = async () => {
+      const plantId = await AsyncStorage.getItem('selectedPlantId');
+      const areaId = await AsyncStorage.getItem('selectedAreaId');
+      
+      if (plantId) {
+        const plant = PLANT_TYPES.find((p) => p.id === plantId);
         if (plant) setSelectedPlant(plant);
       }
-    });
+      if (areaId) {
+        const area = GROWING_AREAS.find((a) => a.id === areaId);
+        if (area) setSelectedArea(area);
+      }
+    };
+    
+    loadPrefs();
     useCurrentLocation();
   }, []);
 
@@ -67,12 +79,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         longitude: location.coords.longitude
       });
 
-      let cityName = 'Bilinmeyen Konum';
+      let formattedName = 'Bilinmeyen Konum';
+      
       if (geocode && geocode.length > 0) {
-        cityName = geocode[0].city || geocode[0].subregion || geocode[0].region || cityName;
+        const address = geocode[0];
+        // İlçe ve İl bilgisini önceliklendir
+        // subregion: Genellikle İlçe (örn: Kadıköy)
+        // region: Genellikle İl (örn: İstanbul)
+        // city: Bazen İl yerine geçebilir
+        
+        const district = address.subregion || address.district;
+        const city = address.region || address.city || address.subregion;
+
+        if (district && city && district !== city) {
+          formattedName = `${district}, ${city}`;
+        } else if (city) {
+          formattedName = city;
+        } else if (district) {
+          formattedName = district;
+        }
       }
       
-      setLocationName(cityName);
+      setLocationName(formattedName);
       await fetchWeatherForCoords(location.coords.latitude, location.coords.longitude);
 
     } catch (error) {
@@ -106,10 +134,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await AsyncStorage.setItem('selectedPlantId', plant.id);
   };
 
+  const setArea = async (area: GrowingArea) => {
+    setSelectedArea(area);
+    await AsyncStorage.setItem('selectedAreaId', area.id);
+  };
+
   return (
     <AppContext.Provider value={{ 
       selectedPlant, 
       setPlant, 
+      selectedArea,
+      setArea,
       weather, 
       loading, 
       locationName,

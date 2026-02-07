@@ -3,17 +3,20 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, A
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../context/AppContext';
 import { calculateIrrigationAdvice } from '../../utils/irrigationLogic';
-import { MapPin, ChevronDown, Droplets, Wind, Thermometer, Calendar, Info } from 'lucide-react-native';
+import { MapPin, ChevronDown, Droplets, Wind, Thermometer, Calendar, Info, ArrowRight } from 'lucide-react-native';
 import LocationDropdown from '../../components/LocationDropdown';
 import PlantSelector from '../../components/PlantSelector';
+import GrowingAreaSelector from '../../components/GrowingAreaSelector';
+import AssistantBubble from '../../components/AssistantBubble';
+import ValueIndicator from '../../components/ValueIndicator';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
 export default function HomeScreen() {
-  const { weather, selectedPlant, setPlant, loading, refreshWeather, locationName } = useApp();
+  const { weather, selectedPlant, setPlant, selectedArea, setArea, loading, refreshWeather, locationName } = useApp();
   const [dropdownVisible, setDropdownVisible] = useState(false);
   
-  const advice = calculateIrrigationAdvice(weather, selectedPlant);
+  const advice = calculateIrrigationAdvice(weather, selectedPlant, selectedArea);
   const today = new Date();
 
   const renderSkeleton = () => (
@@ -63,15 +66,21 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refreshWeather} tintColor="#10B981" />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Plant Selector */}
-        <PlantSelector selectedPlant={selectedPlant} onSelect={setPlant} />
+        {/* Quick Selectors (Onboarding Style) */}
+        <View style={styles.selectorsContainer}>
+           <PlantSelector selectedPlant={selectedPlant} onSelect={setPlant} />
+           <GrowingAreaSelector selectedArea={selectedArea} onSelect={setArea} />
+        </View>
 
         {loading && !weather ? renderSkeleton() : (
           <>
-            {/* Modern Irrigation Card */}
+            {/* Assistant Bubble */}
+            <AssistantBubble message={advice.aiAssistantMessage} />
+
+            {/* Smart Decision Card */}
             <View style={styles.cardContainer}>
               <LinearGradient
-                colors={advice.shouldWater ? ['#10B981', '#059669'] : ['#3B82F6', '#2563EB']}
+                colors={advice.shouldWater ? ['#10B981', '#059669'] : [advice.color, advice.color]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.mainCard}
@@ -89,14 +98,24 @@ export default function HomeScreen() {
                 <Text style={styles.mainDesc}>{advice.message}</Text>
 
                 <View style={styles.methodBox}>
-                  <Text style={styles.methodLabel}>ÖNERİLEN YÖNTEM</Text>
-                  <Text style={styles.methodText}>{advice.method}</Text>
+                  <View>
+                    <Text style={styles.methodLabel}>ÖNERİLEN YÖNTEM</Text>
+                    <Text style={styles.methodText}>{advice.method}</Text>
+                  </View>
+                  {weather && weather.daily[1] && (
+                    <View style={styles.forecastMini}>
+                      <Text style={styles.forecastLabel}>YARIN</Text>
+                      <Text style={styles.forecastText}>{Math.round(weather.daily[1].tempMax)}° / %{Math.round(weather.daily[1].rainProb)} Yağış</Text>
+                    </View>
+                  )}
                 </View>
               </LinearGradient>
               
-              {/* Decorative Shadow/Blur Effect */}
               <View style={[styles.cardShadow, { backgroundColor: advice.color }]} />
             </View>
+
+            {/* Value Indicator (Savings) */}
+            {advice.savingsText && <ValueIndicator text={advice.savingsText} />}
 
             {/* Weather Stats Grid */}
             {weather && (
@@ -121,32 +140,6 @@ export default function HomeScreen() {
                   </View>
                   <Text style={styles.statValue}>{weather.current.windSpeed}</Text>
                   <Text style={styles.statLabel}>Rüzgar</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Tomorrow Preview */}
-            {weather && weather.daily[1] && (
-              <View style={styles.tomorrowSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Yarın</Text>
-                  <Text style={styles.sectionSubtitle}>Tahmin</Text>
-                </View>
-                
-                <View style={styles.tomorrowCard}>
-                  <View style={styles.tomorrowLeft}>
-                    <View style={styles.calendarIcon}>
-                      <Calendar size={20} color="#059669" />
-                    </View>
-                    <View>
-                      <Text style={styles.tomorrowCondition}>{weather.daily[1].condition}</Text>
-                      <Text style={styles.tomorrowRain}>Yağış: %{Math.round(weather.daily[1].rainProb)}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.tomorrowRight}>
-                    <Text style={styles.tomorrowTempMax}>{Math.round(weather.daily[1].tempMax)}°</Text>
-                    <Text style={styles.tomorrowTempMin}>{Math.round(weather.daily[1].tempMin)}°</Text>
-                  </View>
                 </View>
               </View>
             )}
@@ -191,7 +184,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 3,
-    maxWidth: '60%',
+    maxWidth: '65%',
   },
   iconCircle: {
     backgroundColor: '#ECFDF5',
@@ -200,9 +193,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   locationText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'Inter_700Bold',
     color: '#1F2937',
+    flex: 1,
   },
   dateBadge: {
     alignItems: 'flex-end',
@@ -223,6 +217,9 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 10,
   },
+  selectorsContainer: {
+    marginBottom: 10,
+  },
   skeletonContainer: {
     height: 300,
     justifyContent: 'center',
@@ -237,7 +234,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
   },
   cardContainer: {
-    marginTop: 10,
     marginBottom: 24,
     position: 'relative',
   },
@@ -297,6 +293,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderLeftWidth: 4,
     borderLeftColor: 'rgba(255,255,255,0.5)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   methodLabel: {
     color: 'rgba(255,255,255,0.7)',
@@ -309,6 +308,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 15,
     fontFamily: 'Inter_600SemiBold',
+  },
+  forecastMini: {
+    alignItems: 'flex-end',
+  },
+  forecastLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  forecastText: {
+    color: 'white',
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -340,76 +354,6 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
-    fontFamily: 'Inter_500Medium',
-  },
-  tomorrowSection: {
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-    color: '#111827',
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: '#9CA3AF',
-  },
-  tomorrowCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  tomorrowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  calendarIcon: {
-    backgroundColor: '#F0FDF4',
-    padding: 10,
-    borderRadius: 12,
-  },
-  tomorrowCondition: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#374151',
-    textTransform: 'capitalize',
-  },
-  tomorrowRain: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
-    fontFamily: 'Inter_500Medium',
-  },
-  tomorrowRight: {
-    alignItems: 'flex-end',
-  },
-  tomorrowTempMax: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-    color: '#1F2937',
-  },
-  tomorrowTempMin: {
-    fontSize: 14,
-    color: '#9CA3AF',
     fontFamily: 'Inter_500Medium',
   },
 });
