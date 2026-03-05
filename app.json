@@ -2,7 +2,7 @@
     "expo": {
       "name": "react-native-expo-starter",
       "slug": "react-native-expo-starter",
-      "version": "1.0.0",
+      "version": "1.0.8",
       "orientation": "portrait",
       "scheme": "myapp",
       "userInterfaceStyle": "automatic",
@@ -19,4 +19,5 @@
         "typedRoutes": true
       }
     }
+
   }
