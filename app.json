@@ -11,7 +11,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.hediyenurerdogan.sulamaapp",
+      "package": "com.hediyenur.app",
       "versionCode": 3
     },
     "web": {
@@ -24,3 +24,4 @@
     }
   }
 }
+
