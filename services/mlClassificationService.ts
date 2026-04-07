@@ -29,11 +29,6 @@ export const classifyImageCloud = async (base64Data: string): Promise<ImageClass
     throw new Error("API Anahtarı eksik. Lütfen .env dosyasına ekleyin.");
   }
 
-  // Eğer web ortamından dummy data gelirse, API'yi yormamak için sahte bitki yanıtı dön
-  if (base64Data === "dummy_base64_for_web") {
-    return { type: 'plant', confidence: 0.99 };
-  }
-
   try {
     const prompt = `Bu görselde ne görüyorsun? Lütfen görselin ana temasını analiz et ve AŞAĞIDAKİ JSON FORMATINDA döndür. Sadece JSON döndür, markdown kullanma.
     {

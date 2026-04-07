@@ -29,9 +29,23 @@ export default function AdvancedImageClassifier({ imageUri, onRetake, onProceedT
           setTimeout(() => reject(new Error("İşlem zaman aşımına uğradı. Lütfen ağ bağlantınızı kontrol edip tekrar deneyin.")), 15000)
         );
 
-        let base64Data = "dummy_base64_for_web";
+        let base64Data = "";
         
-        if (Platform.OS !== 'web') {
+        if (Platform.OS === 'web') {
+          // Web ortamında Blob URI'yi Base64'e çevirme işlemi
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          base64Data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1]); // Sadece base64 verisini al
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          // Mobil ortamda ImageManipulator kullanımı
           const processedImage = await Promise.race([
             preprocessImage(imageUri),
             timeoutPromise
@@ -111,23 +125,23 @@ export default function AdvancedImageClassifier({ imageUri, onRetake, onProceedT
             <Text style={styles.errorText}>{result.error}</Text>
           </View>
         ) : isStrictlyNotAPlant ? (
-          // KESİN KURAL: Bitki değilse gösterilecek özel hata mesajı
+          // KESİN KURAL: Başarılı mesajıyla aynı görsel düzene (row) sahip hata kutusu
           <View style={styles.criticalErrorBox}>
-            <XCircle size={32} color="#DC2626" />
-            <Text style={styles.criticalErrorTitle}>Bitki Tespit Edilemedi</Text>
-            <Text style={styles.criticalErrorText}>
-              Bu bir bitki resmi gibi görünmüyor. Lütfen detaylı analiz için bir bitki resmi yükleyin.
-            </Text>
-            {/* Tespit edilen türü küçük bir not olarak göster */}
-            <Text style={styles.detectedTypeNote}>
-              Tespit edilen tür: {prediction.type === 'human' ? 'İnsan' : prediction.type === 'animal' ? 'Hayvan' : 'Diğer Nesne'}
-            </Text>
+            <XCircle size={24} color="#DC2626" />
+            <View style={{flex: 1}}>
+              <Text style={styles.criticalErrorTitle}>Bitki Bulunamadı</Text>
+              <Text style={styles.criticalErrorText}>
+                Bu bir {prediction.type === 'human' ? 'insan' : prediction.type === 'animal' ? 'hayvan' : 'nesne'} resmi. Lütfen bir bitki resmi yükleyin.
+              </Text>
+            </View>
           </View>
         ) : result?.isUncertain ? (
           <View style={styles.uncertainBox}>
             <ShieldAlert size={24} color="#F59E0B" />
-            <Text style={styles.uncertainText}>Sınıflandırma belirsiz.</Text>
-            <Text style={styles.uncertainSubText}>Görsel net değil veya bir bitki tespit edilemedi. Lütfen daha aydınlık ve net bir fotoğraf çekin.</Text>
+            <View style={{flex: 1}}>
+              <Text style={styles.uncertainText}>Sınıflandırma Belirsiz</Text>
+              <Text style={styles.uncertainSubText}>Görsel net değil. Lütfen daha aydınlık bir fotoğraf çekin.</Text>
+            </View>
           </View>
         ) : (
           <View style={styles.successBox}>
@@ -169,17 +183,18 @@ const styles = StyleSheet.create({
   loadingSubText: { color: '#9CA3AF', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 8, textAlign: 'center' },
   resultCard: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 20 },
   title: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#111827', marginBottom: 16 },
+  
   errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', padding: 16, borderRadius: 12, gap: 12, marginBottom: 20 },
   errorText: { flex: 1, color: '#991B1B', fontFamily: 'Inter_500Medium', fontSize: 14, lineHeight: 20 },
   
-  criticalErrorBox: { alignItems: 'center', backgroundColor: '#FEF2F2', padding: 24, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#FECACA' },
-  criticalErrorTitle: { color: '#DC2626', fontFamily: 'Inter_700Bold', fontSize: 18, marginTop: 12, marginBottom: 8 },
-  criticalErrorText: { color: '#991B1B', fontFamily: 'Inter_500Medium', fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  detectedTypeNote: { color: '#EF4444', fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 12, opacity: 0.8 },
+  // Başarılı mesaj stiliyle tamamen aynı yapı (row layout, aynı padding ve font boyutları)
+  criticalErrorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', padding: 16, borderRadius: 12, gap: 12, marginBottom: 24, borderWidth: 1, borderColor: '#FECACA' },
+  criticalErrorTitle: { color: '#991B1B', fontFamily: 'Inter_700Bold', fontSize: 15, marginBottom: 2 },
+  criticalErrorText: { color: '#B91C1C', fontFamily: 'Inter_500Medium', fontSize: 13 },
   
-  uncertainBox: { alignItems: 'center', backgroundColor: '#FFFBEB', padding: 20, borderRadius: 12, marginBottom: 20 },
-  uncertainText: { color: '#B45309', fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 8 },
-  uncertainSubText: { color: '#92400E', fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 18 },
+  uncertainBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEB', padding: 16, borderRadius: 12, gap: 12, marginBottom: 24, borderWidth: 1, borderColor: '#FDE68A' },
+  uncertainText: { color: '#B45309', fontFamily: 'Inter_700Bold', fontSize: 15, marginBottom: 2 },
+  uncertainSubText: { color: '#92400E', fontFamily: 'Inter_500Medium', fontSize: 13 },
   
   successBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 16, borderRadius: 12, gap: 12, marginBottom: 24, borderWidth: 1, borderColor: '#A7F3D0' },
   successTitle: { color: '#065F46', fontFamily: 'Inter_700Bold', fontSize: 15, marginBottom: 2 },
