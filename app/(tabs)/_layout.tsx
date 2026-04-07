@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { CloudSun, Home, Sprout } from 'lucide-react-native';
+import { CloudSun, Home, Sprout, ScanLine } from 'lucide-react-native';
 import { Platform, View } from 'react-native';
 
 export default function TabLayout() {
@@ -47,6 +47,32 @@ export default function TabLayout() {
         }}
       />
       
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: 'Tara',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: '#10B981',
+              padding: 12,
+              borderRadius: 30,
+              width: 56,
+              height: 56,
+              marginTop: -20, // Butonu yukarı kaldırarak vurguluyoruz
+              shadowColor: '#10B981',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 4,
+            }}>
+              <ScanLine size={26} color="white" strokeWidth={2.5} />
+            </View>
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="plants"
         options={{

@@ -44,8 +44,6 @@ export interface IrrigationAdvice {
   aiAssistantMessage: string; // Asistan konuşma metni
 }
 
-// --- YENİ EKLENEN TİPLER ---
-
 export type WaterNeed = 'Az' | 'Orta' | 'Çok';
 
 export interface PlantLocation {
@@ -63,6 +61,32 @@ export interface Plant {
   lastSoilChangeDate: string | null; // ISO Date string
   notificationsEnabled: boolean;
   createdAt: string;
+}
+
+// --- YAPAY ZEKA BİTKİ TANIMLAMA TİPLERİ ---
+
+export interface AICareInstructions {
+  watering: string;
+  light: string;
+  soil: string;
+  temperature: string;
+  humidity: string;
+}
+
+export interface AIPlantIdentification {
+  commonName: string;
+  scientificName: string;
+  pronunciation: string;
+  description: string;
+  careInstructions: AICareInstructions;
+  pestsAndDiseases: string[];
+  origin: string;
+  uniqueFacts: string[];
+  confidenceScore: number;
+  // Yeni Eklenen Sağlık ve Teşhis Alanları
+  healthStatus: 'Sağlıklı' | 'İlgiye İhtiyacı Var' | 'Kritik';
+  diseaseSymptoms: string[];
+  treatmentAdvice: string[];
 }
 
 // ---------------------------
